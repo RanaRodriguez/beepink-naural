@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, MotionValue, useSpring, useTransform } from "motion/react";
-import styles from "./BackgroundBlob.module.css";
 
 interface BackgroundBlobProps {
   mouseX: MotionValue<number>;
@@ -507,7 +506,7 @@ export const BackgroundBlob = ({ mouseX, mouseY }: BackgroundBlobProps) => {
       animate={{ opacity: opacity }}
       exit={{ opacity: 0 }}
       transition={{ duration: 1.5 }}
-      className={styles.container}
+      className="position-fixed inset-0 pointer-events-none -z-1"
     >
       <canvas
         ref={(node) => {
@@ -521,7 +520,7 @@ export const BackgroundBlob = ({ mouseX, mouseY }: BackgroundBlobProps) => {
             node.style.filter = `blur(${blurAmount}px)`;
           }
         }}
-        className={styles.canvas}
+        className="position-fixed top-0 left-0 w-full h-full opacity-15 will-change-auto"
       />
     </motion.div>
   );
