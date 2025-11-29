@@ -8,6 +8,8 @@ import { BrainWaveDisplay } from './components/BrainWaveDisplay';
 import { BackgroundBlob } from './components/BackgroundBlob';
 import { Switch } from './components/Switch';
 import { AnimatePresence, useMotionValue, motion } from 'motion/react';
+import { useIsMobile } from './hooks/useIsMobile';
+import { useIsMozilla } from './hooks/useIsMozilla';
 
 interface FlipButtonProps {
   onClick: () => void;
@@ -28,9 +30,12 @@ const FlipButton = ({ onClick, targetLabel }: FlipButtonProps) => (
 );
 
 function App() {
+  const isMobile = useIsMobile();
+  const isMozilla = useIsMozilla();
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.3);
-  const [showBlob, setShowBlob] = useState(true);
+  // Disable blob on Mozilla browsers due to rendering issues
+  const [showBlob, setShowBlob] = useState(!isMobile && !isMozilla);
   const [isFlipped, setIsFlipped] = useState(false);
 
   // Front Face State (Classic)
@@ -199,19 +204,21 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-slate-100 flex flex-col items-center justify-center p-8 font-sans relative z-0 overflow-hidden">
+    <div className="min-h-screen bg-black text-slate-100 flex flex-col items-center justify-center px-8 py-14 font-sans relative z-0 overflow-hidden">
       <AnimatePresence>
         {showBlob && <BackgroundBlob key="blob" mouseX={mouseX} mouseY={mouseY} />}
       </AnimatePresence>
       
-      {/* Top controls container */}
-      <div className="absolute top-4 right-4 z-50">
-        <Switch 
-          checked={showBlob} 
-          onChange={setShowBlob} 
-          label="Visuals" 
-        />
-      </div>
+      {/* Top controls container - Hide blob toggle on Mozilla browsers */}
+      {!isMozilla && (
+        <div className="absolute top-4 right-4 z-50">
+          <Switch 
+            checked={showBlob} 
+            onChange={setShowBlob} 
+            label="Shimmer" 
+          />
+        </div>
+      )}
 
       <div className="perspective-1000 w-full max-w-md relative z-10">
         <motion.div 
@@ -222,7 +229,7 @@ function App() {
         >
           {/* FRONT FACE */}
           <div className="backface-hidden bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 w-full relative flex flex-col">
-            <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-pink-400 to-purple-400 text-transparent bg-clip-text">
+            <h1 className="text-3xl font-bold text-center mb-2 bg-linear-to-r from-pink-400 to-purple-400 text-transparent bg-clip-text">
               BeePink Naural
             </h1>
             <p className="text-slate-400 text-center mb-8 text-sm">
@@ -315,8 +322,8 @@ function App() {
           </div>
 
           {/* BACK FACE */}
-          <div className="backface-hidden absolute top-0 left-0 w-full h-full rotate-y-[180deg] bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 flex flex-col">
-            <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-teal-400 to-blue-400 text-transparent bg-clip-text">
+          <div className="backface-hidden absolute top-0 left-0 w-full h-full rotate-y-180 bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 flex flex-col">
+            <h1 className="text-3xl font-bold text-center mb-2 bg-linear-to-r from-teal-400 to-blue-400 text-transparent bg-clip-text">
               Naural Pulse
             </h1>
             <p className="text-slate-400 text-center mb-8 text-sm">
