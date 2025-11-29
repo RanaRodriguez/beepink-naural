@@ -32,7 +32,34 @@ function isIOS(): boolean {
 }
 
 /**
- * Creates and plays a silent HTML5 audio element to unlock iOS audio.
+ * Pre-initializes the silent audio element so it's ready for instant playback.
+ * Call this on app mount (outside of user interaction).
+ */
+export function initIOSAudio(): void {
+  if (!isIOS() || silentAudioElement) {
+    return;
+  }
+
+  silentAudioElement = document.createElement('audio');
+
+  // Prevent showing in AirPlay/lockscreen controls
+  silentAudioElement.setAttribute('x-webkit-airplay', 'deny');
+
+  // Configure for background playback
+  silentAudioElement.preload = 'auto';
+  silentAudioElement.loop = true;
+  silentAudioElement.volume = 0.01; // Near-silent but not zero (some browsers ignore 0)
+  silentAudioElement.src = SILENT_WAV_BASE64;
+
+  // Required for iOS to allow background playback
+  silentAudioElement.setAttribute('playsinline', 'true');
+
+  // Force load the audio data
+  silentAudioElement.load();
+}
+
+/**
+ * Plays the silent HTML5 audio element to unlock iOS audio.
  * Must be called SYNCHRONOUSLY during a user interaction (click, touch, etc.)
  *
  * IMPORTANT: This function must remain synchronous (no async/await before play())
@@ -45,21 +72,13 @@ export function unlockIOSAudio(): void {
     return;
   }
 
-  // Create silent audio element if not exists
+  // Initialize if not already done (fallback)
   if (!silentAudioElement) {
-    silentAudioElement = document.createElement('audio');
+    initIOSAudio();
+  }
 
-    // Prevent showing in AirPlay/lockscreen controls
-    silentAudioElement.setAttribute('x-webkit-airplay', 'deny');
-
-    // Configure for background playback
-    silentAudioElement.preload = 'auto';
-    silentAudioElement.loop = true;
-    silentAudioElement.volume = 0.01; // Near-silent but not zero (some browsers ignore 0)
-    silentAudioElement.src = SILENT_WAV_BASE64;
-
-    // Required for iOS to allow background playback
-    silentAudioElement.setAttribute('playsinline', 'true');
+  if (!silentAudioElement) {
+    return;
   }
 
   // Play the silent audio - this "kicks" iOS into media category

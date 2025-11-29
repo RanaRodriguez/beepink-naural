@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PinkNoiseGenerator } from './audio/PinkNoiseGenerator';
 import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
-import { unlockIOSAudio, stopIOSAudioUnlock } from './audio/unlockIOSAudio';
+import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock } from './audio/unlockIOSAudio';
 import { Slider } from './components/Slider';
 import { SectionHeader } from './components/SectionHeader';
 import { PlayButton } from './components/PlayButton';
@@ -140,6 +140,11 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFlipped]);
+
+  // Pre-initialize iOS audio on mount (so it's ready for instant playback)
+  useEffect(() => {
+    initIOSAudio();
+  }, []);
 
   useEffect(() => {
     return () => {
