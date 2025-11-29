@@ -1,0 +1,214 @@
+# BeePink Neural - Cursor Rules
+
+## Project Overview
+This is a React + TypeScript web application for generating binaural beats and pink noise using the Web Audio API. The app features a dual-mode interface (front: classic binaural beats, back: neural pulse modulation).
+
+## Tech Stack
+- React 19.2 with TypeScript
+- Vite for build tooling
+- Tailwind CSS 4.17 for styling
+- Motion (Framer Motion) for animations
+- Web Audio API (native browser audio, no external libraries)
+
+## Web Audio API Patterns
+
+### Audio Context Management
+- Always use `useRef` to store `AudioContext` instances - never recreate them unnecessarily
+- Check `audioContext.state === 'suspended'` and call `resume()` before starting playback
+- Always clean up audio context in component unmount: `audioContext.close()`
+- Use `window.AudioContext || window.webkitAudioContext` for browser compatibility
+
+### Audio Node Lifecycle
+- Create audio nodes (GainNode, OscillatorNode, etc.) in the constructor or initialization method
+- Use `setTargetAtTime()` for smooth parameter transitions (ramp time ~0.1s)
+- Always disconnect and stop nodes before nullifying references
+- For oscillators: stop before disconnect, then set to null
+- For buffer sources: stop and disconnect, then set to null
+
+### Audio Processing Patterns
+- Use `GainNode` for volume control with smooth transitions
+- Use `StereoPannerNode` for spatial audio effects
+- LFOs (Low Frequency Oscillators) should be created once and reused, not recreated on every parameter change
+- Connect LFOs to depth control `GainNode`s, not directly to target parameters
+- Use `ChannelMergerNode` for explicit stereo channel routing (input 0 = left, input 1 = right)
+
+### Pink Noise Generation
+- Use Paul Kellet's refined method (7-stage filter) for pink noise generation
+- Generate noise in an `AudioBuffer` (2 seconds is a good buffer size)
+- Use `loop = true` on `AudioBufferSourceNode` for continuous playback
+- Apply gain compensation (~0.11 multiplier) to normalize output
+
+### Binaural Beats
+- Left ear: base frequency
+- Right ear: base frequency + beat frequency
+- Use sine wave oscillators (`type = 'sine'`)
+- Set initial frequency values directly (`.value`) on first start to avoid interpolation from default 440Hz
+- Use `setTargetAtTime()` for frequency changes after initialization
+
+## React Patterns
+
+### Component Structure
+- Use functional components with hooks
+- Prefer `forwardRef` for components that need ref forwarding (like Slider)
+- Use `displayName` for forwardRef components for better debugging
+
+### State Management
+- Keep audio-related state separate from UI state
+- Use `useState` for UI state, `useRef` for audio nodes and DOM refs
+- Group related state (e.g., front face state vs back face state)
+
+### Effects and Cleanup
+- Always return cleanup functions from `useEffect` for:
+  - Event listeners (keyboard, mouse)
+  - Audio context closure
+  - Animation cleanup
+- Use dependency arrays correctly - include all values used in the effect
+
+### Refs Usage
+- Use refs for:
+  - Audio nodes (`AudioContext`, generators)
+  - DOM elements that need focus management (for keyboard shortcuts)
+  - Values that should persist across renders without causing re-renders
+
+### Keyboard Shortcuts
+- Handle keyboard events at the App level, not individual components
+- Check if focus is in a text input before preventing default
+- Use lowercase key comparison: `e.key.toLowerCase()`
+- Focus sliders using refs, then blur on Escape
+
+## TypeScript Conventions
+
+### Type Safety
+- Use strict TypeScript settings
+- Define interfaces for all component props
+- Use type annotations for audio node types (`AudioContext`, `GainNode`, etc.)
+- Use `as` type assertions sparingly and only when necessary (e.g., `window as unknown as { webkitAudioContext: typeof AudioContext }`)
+
+### Naming
+- Classes: PascalCase (e.g., `PinkNoiseGenerator`)
+- Components: PascalCase (e.g., `Slider`, `PlayButton`)
+- Functions: camelCase (e.g., `togglePlay`, `setVolume`)
+- Constants: camelCase or UPPER_SNAKE_CASE depending on scope
+
+## Component Patterns
+
+### Slider Component
+- Supports both controlled and editable modes
+- Handles keyboard navigation (arrows, shift for 10x steps)
+- Validates numeric input with regex
+- Clamps values on blur/commit
+- Supports shortcut character highlighting in labels
+- Uses forwardRef for focus management
+
+### Audio Generator Classes
+- Encapsulate all audio node creation and management
+- Provide public methods: `start()`, `stop()`, `setVolume()`, `connect()`
+- Handle internal state (oscillators, buffers) privately
+- Support optional initial parameters in `start()` methods
+- Use smooth parameter transitions (setTargetAtTime)
+
+## Styling (Tailwind CSS)
+
+### Color Scheme
+- Background: `bg-black` (main), `bg-black/40 backdrop-blur-sm` (cards)
+- Text: `text-slate-100` (primary), `text-slate-400` (secondary), `text-slate-600` (tertiary)
+- Accent colors: `pink`, `purple`, `teal`, `blue` (for gradients and highlights)
+- Borders: `border-white/10`, `border-slate-700/50`
+
+### Layout
+- Use flexbox for component layouts
+- Use `space-y-*` for vertical spacing between related elements
+- Use `perspective-1000` and `transform-style-3d` for 3D flip effects
+- Use `backface-hidden` for card flip animations
+
+### Responsive Design
+- Use `max-w-md` for main content container
+- Center content with `flex items-center justify-center`
+- Use responsive padding: `p-8` on desktop, adjust for mobile if needed
+
+## Code Organization
+
+### File Structure
+```
+src/
+  audio/          # Audio generator classes
+  components/     # React components
+  assets/         # Static assets
+```
+
+### Import Order
+1. React imports
+2. Third-party library imports (motion, etc.)
+3. Local component imports
+4. Local utility/class imports
+5. CSS/asset imports
+
+## Performance Considerations
+
+### Audio Performance
+- Reuse audio nodes instead of creating new ones
+- Use `setTargetAtTime()` instead of immediate value changes for smooth audio
+- Buffer pink noise generation (don't generate on every sample)
+
+### React Performance
+- Use `useRef` for values that don't need to trigger re-renders
+- Memoize expensive calculations if needed
+- Keep effect dependencies minimal and accurate
+
+## Testing Considerations
+
+### Audio Testing
+- Mock `AudioContext` and related Web Audio API classes
+- Test parameter changes and smooth transitions
+- Verify cleanup on component unmount
+- Test audio node connections and routing
+
+### Component Testing
+- Test keyboard shortcuts and focus management
+- Test slider value clamping and validation
+- Test dual-mode state transitions
+
+## Common Pitfalls to Avoid
+
+1. **Don't recreate AudioContext** - Use refs and check if it exists
+2. **Don't forget cleanup** - Always stop/disconnect audio nodes
+3. **Don't use immediate value changes** - Use `setTargetAtTime()` for smooth audio
+4. **Don't recreate oscillators** - Reuse them and update frequency
+5. **Don't forget to handle suspended audio context** - Check state and resume
+6. **Don't mix audio state with UI state** - Keep them separate
+7. **Don't forget keyboard event cleanup** - Remove listeners on unmount
+
+## Code Style
+
+### Formatting
+- Use 2 spaces for indentation
+- Use semicolons
+- Use single quotes for strings (or double quotes, be consistent)
+- Use trailing commas in multi-line objects/arrays
+
+### Comments
+- Comment complex audio processing algorithms
+- Explain non-obvious audio routing decisions
+- Document keyboard shortcut mappings
+- Add TODO comments for known issues or future improvements
+
+## When Adding New Features
+
+### Audio Features
+- Follow the existing generator class pattern
+- Ensure proper cleanup
+- Use smooth parameter transitions
+- Test with headphones (binaural/spatial effects)
+
+### UI Features
+- Maintain the dark theme aesthetic
+- Use consistent spacing and typography
+- Follow the existing component patterns
+- Consider keyboard accessibility
+
+### New Components
+- Use TypeScript interfaces for props
+- Support keyboard navigation where appropriate
+- Use Tailwind classes, avoid custom CSS when possible
+- Follow the existing naming conventions
+

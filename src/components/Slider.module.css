@@ -1,0 +1,69 @@
+@reference "../index.css";
+
+/* Slider.module.css */
+
+.slider {
+  @apply w-full h-8 bg-transparent appearance-none cursor-pointer focus:outline-none focus:ring-0;
+  /* Remove default tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+.slider::-webkit-slider-thumb {
+  @apply appearance-none w-6 h-6 rounded-full bg-current shadow-lg transition-transform duration-200 ease-out relative z-20;
+  /* Center thumb vertically relative to the custom track height */
+  margin-top: -10px; 
+}
+
+/* Firefox */
+.slider::-moz-range-thumb {
+  @apply w-6 h-6 rounded-full bg-current border-none shadow-lg transition-transform duration-200 ease-out relative z-20;
+}
+
+/* Hover Effects: Scale Thumb */
+.slider:hover::-webkit-slider-thumb {
+  @apply scale-110;
+}
+
+.slider:hover::-moz-range-thumb {
+  @apply scale-110;
+}
+
+/* Active/Focus Effects */
+.slider:active::-webkit-slider-thumb,
+.slider:focus::-webkit-slider-thumb {
+  @apply scale-125 ring-2 ring-slate-100;
+}
+
+.slider:active::-moz-range-thumb,
+.slider:focus::-moz-range-thumb {
+  @apply scale-125 ring-2 ring-slate-100;
+}
+
+/* Focused Track Styling */
+.slider:focus::-webkit-slider-runnable-track {
+  @apply bg-slate-500 shadow-inner;
+}
+
+.slider:focus::-moz-range-track {
+  @apply bg-slate-500 shadow-inner;
+}
+
+/* Track Styling - Webkit */
+.slider::-webkit-slider-runnable-track {
+  @apply w-full h-1 bg-slate-700 rounded-lg transition-colors duration-300;
+}
+
+/* Track Styling - Firefox */
+.slider::-moz-range-track {
+  @apply w-full h-1 bg-slate-700 rounded-lg transition-colors duration-300;
+}
+
+/* Increase hit area without changing visual height too much */
+.slider:hover::-webkit-slider-runnable-track {
+  @apply bg-slate-600;
+}
+
+.slider:hover::-moz-range-track {
+  @apply bg-slate-600;
+}

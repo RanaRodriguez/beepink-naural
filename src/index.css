@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-900: oklch(0.208 0.042 265.755);
+  --color-slate-800: oklch(0.279 0.041 260.031);
+  --perspective-1000: 1000px;
+}
