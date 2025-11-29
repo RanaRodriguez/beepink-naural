@@ -173,10 +173,11 @@ function App() {
     }
   }, [isPlaying, volume, noiseVolume, beatVolume, baseFreq, beatFreq, isFlipped, neuralFreq, neuralPulseDepth, neuralPanDepth, neuralNoiseVolume]);
 
-  const togglePlay = async () => {
+  const togglePlay = () => {
     // When starting playback, unlock iOS audio first (bypasses mute switch)
+    // IMPORTANT: Must be synchronous - no await before play() calls on iOS Safari
     if (!isPlaying) {
-      await unlockIOSAudio();
+      unlockIOSAudio(); // Synchronous call - don't await
     }
 
     if (!audioContextRef.current) {
@@ -203,7 +204,7 @@ function App() {
     }
 
     if (audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume();
+      audioContextRef.current.resume(); // Don't await - must stay synchronous for iOS
     }
 
     // When stopping, also stop the iOS unlock audio

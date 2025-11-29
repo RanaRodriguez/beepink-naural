@@ -33,42 +33,43 @@ function isIOS(): boolean {
 
 /**
  * Creates and plays a silent HTML5 audio element to unlock iOS audio.
- * Must be called during a user interaction (click, touch, etc.)
+ * Must be called SYNCHRONOUSLY during a user interaction (click, touch, etc.)
  *
- * @returns Promise that resolves when audio is unlocked
+ * IMPORTANT: This function must remain synchronous (no async/await before play())
+ * because iOS Safari only allows audio playback in direct response to user gestures.
+ * Any async operation breaks the "trust chain" and iOS will block the audio.
  */
-export async function unlockIOSAudio(): Promise<void> {
+export function unlockIOSAudio(): void {
   // Skip if not iOS or already unlocked
   if (!isIOS() || isUnlocked) {
     return;
   }
 
-  try {
-    // Create silent audio element if not exists
-    if (!silentAudioElement) {
-      silentAudioElement = document.createElement('audio');
+  // Create silent audio element if not exists
+  if (!silentAudioElement) {
+    silentAudioElement = document.createElement('audio');
 
-      // Prevent showing in AirPlay/lockscreen controls
-      silentAudioElement.setAttribute('x-webkit-airplay', 'deny');
+    // Prevent showing in AirPlay/lockscreen controls
+    silentAudioElement.setAttribute('x-webkit-airplay', 'deny');
 
-      // Configure for background playback
-      silentAudioElement.preload = 'auto';
-      silentAudioElement.loop = true;
-      silentAudioElement.volume = 0.01; // Near-silent but not zero (some browsers ignore 0)
-      silentAudioElement.src = SILENT_WAV_BASE64;
+    // Configure for background playback
+    silentAudioElement.preload = 'auto';
+    silentAudioElement.loop = true;
+    silentAudioElement.volume = 0.01; // Near-silent but not zero (some browsers ignore 0)
+    silentAudioElement.src = SILENT_WAV_BASE64;
 
-      // Required for iOS to allow background playback
-      silentAudioElement.setAttribute('playsinline', 'true');
-    }
+    // Required for iOS to allow background playback
+    silentAudioElement.setAttribute('playsinline', 'true');
+  }
 
-    // Play the silent audio - this "kicks" iOS into media category
-    await silentAudioElement.play();
+  // Play the silent audio - this "kicks" iOS into media category
+  // Don't await - must be synchronous for iOS Safari user gesture requirement
+  silentAudioElement.play().then(() => {
     isUnlocked = true;
-
-  } catch (error) {
+  }).catch((error) => {
     // Silently fail - audio will just respect mute switch on iOS
     console.warn('iOS audio unlock failed:', error);
-  }
+  });
 }
 
 /**
