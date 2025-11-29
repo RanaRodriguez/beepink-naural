@@ -222,13 +222,12 @@ function App() {
 
       <div className="perspective-1000 w-full max-w-md relative z-10">
         <motion.div 
-          className="w-full relative transform-3d duration-700"
+          className="w-full relative transform-3d duration-700 h-auto"
           animate={{ rotateY: isFlipped ? 180 : 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 20 }}
-          style={{ height: 'auto' }} // Allow dynamic height? Difficult with absolute. Assuming Front is height setter.
         >
           {/* FRONT FACE */}
-          <div className="backface-hidden bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 w-full relative flex flex-col">
+          <div className="bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 w-full relative flex flex-col backface-hidden">
             <h1 className="text-3xl font-bold text-center mb-2 bg-linear-to-r from-pink-400 to-purple-400 text-transparent bg-clip-text">
               BeePink Naural
             </h1>
