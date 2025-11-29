@@ -1,7 +1,7 @@
 # Task 001: Fix iPhone Mute Switch Preventing Audio Playback
 
 ## Meta
-- Status: in-progress
+- Status: done
 - Created: 2025-11-29
 - Updated: 2025-11-29
 - Type: Research AND Implementation
@@ -42,10 +42,10 @@
 ## Done When
 - [x] Root cause identified and documented in task file with references
 - [x] Solution implemented in AudioContext initialization code
-- [ ] Audio plays on iPhone with mute switch enabled (both binaural beats and pink noise)
-- [ ] No regression in desktop browser or Android audio functionality
-- [ ] Tested on physical iPhone with mute switch on/off
-- [ ] Tested on iOS simulator for additional verification
+- [x] Audio plays on iPhone with mute switch enabled (both binaural beats and pink noise)
+- [x] No regression in desktop browser or Android audio functionality
+- [x] Tested on physical iPhone with mute switch on/off
+- [x] Tested on iOS simulator for additional verification
 
 ## Reference
 **Related Files:**
