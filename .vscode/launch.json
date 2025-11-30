@@ -4,15 +4,7 @@
     {
       "type": "chrome",
       "request": "launch",
-      "name": "Launch Chrome against localhost",
-      "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}",
-      "preLaunchTask": "dev"
-    },
-    {
-      "type": "pwa-chrome",
-      "request": "launch",
-      "name": "Launch Chrome (PWA)",
+      "name": "Launch App",
       "url": "http://localhost:5173",
       "webRoot": "${workspaceFolder}",
       "preLaunchTask": "dev"

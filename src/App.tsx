@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { PinkNoiseGenerator } from './audio/PinkNoiseGenerator';
 import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
 import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock } from './audio/unlockIOSAudio';
@@ -8,8 +8,11 @@ import { PlayButton } from './components/PlayButton';
 import { BrainWaveDisplay } from './components/BrainWaveDisplay';
 import { BackgroundBlob } from './components/BackgroundBlob';
 import { Switch } from './components/Switch';
+import { PresetSection } from './components/PresetSection';
+import { AppHeader } from './components/AppHeader';
 import { AnimatePresence, useMotionValue, motion } from 'motion/react';
 import { useIsMozilla } from './hooks/useIsMozilla';
+import { usePresets, type FrontPreset, type BackPreset } from './hooks/usePresets';
 
 interface FlipButtonProps {
   onClick: () => void;
@@ -31,11 +34,18 @@ const FlipButton = ({ onClick, targetLabel }: FlipButtonProps) => (
 
 function App() {
   const isMozilla = useIsMozilla();
+  const presets = usePresets();
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.3);
   // Disable blob on Mozilla browsers due to rendering issues
   const [showBlob, setShowBlob] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
+
+  // Preset state
+  const [activePresetFront, setActivePresetFront] = useState<number | null>(null);
+  const [activePresetBack, setActivePresetBack] = useState<number | null>(null);
+  // Force re-render when presets change (for hasPreset to reflect localStorage changes)
+  const [presetVersion, setPresetVersion] = useState(0);
 
   // Front Face State (Classic)
   const [noiseVolume, setNoiseVolume] = useState(0.5);
@@ -79,6 +89,69 @@ function App() {
   const neuralFreqRef = useRef<HTMLInputElement>(null);
   const pulseDepthRef = useRef<HTMLInputElement>(null);
   const panDepthRef = useRef<HTMLInputElement>(null);
+
+  // Preset handlers
+  const handleSavePreset = (side: 'front' | 'back', slot: 1 | 2 | 3 | 4) => {
+    if (side === 'front') {
+      const preset: FrontPreset = {
+        volume,
+        noiseVolume,
+        beatVolume,
+        baseFreq,
+        beatFreq,
+      };
+      if (presets.savePreset(side, slot, preset)) {
+        setActivePresetFront(slot);
+        setPresetVersion(v => v + 1);
+      }
+    } else {
+      const preset: BackPreset = {
+        volume,
+        neuralFreq,
+        neuralPulseDepth,
+        neuralPanDepth,
+        neuralNoiseVolume,
+      };
+      if (presets.savePreset(side, slot, preset)) {
+        setActivePresetBack(slot);
+        setPresetVersion(v => v + 1);
+      }
+    }
+  };
+
+  const handleLoadPreset = useCallback((side: 'front' | 'back', slot: 1 | 2 | 3 | 4) => {
+    const preset = presets.loadPreset(side, slot);
+    if (!preset) return;
+
+    if (side === 'front') {
+      const frontPreset = preset as FrontPreset;
+      setVolume(frontPreset.volume);
+      setNoiseVolume(frontPreset.noiseVolume);
+      setBeatVolume(frontPreset.beatVolume);
+      setBaseFreq(frontPreset.baseFreq);
+      setBeatFreq(frontPreset.beatFreq);
+      setActivePresetFront(slot);
+    } else {
+      const backPreset = preset as BackPreset;
+      setVolume(backPreset.volume);
+      setNeuralFreq(backPreset.neuralFreq);
+      setNeuralPulseDepth(backPreset.neuralPulseDepth);
+      setNeuralPanDepth(backPreset.neuralPanDepth);
+      setNeuralNoiseVolume(backPreset.neuralNoiseVolume);
+      setActivePresetBack(slot);
+    }
+  }, [presets]);
+
+  const handleDeletePreset = (side: 'front' | 'back', slot: 1 | 2 | 3 | 4) => {
+    if (presets.deletePreset(side, slot)) {
+      if (side === 'front' && activePresetFront === slot) {
+        setActivePresetFront(null);
+      } else if (side === 'back' && activePresetBack === slot) {
+        setActivePresetBack(null);
+      }
+      setPresetVersion(v => v + 1);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,12 +205,26 @@ function App() {
           e.preventDefault();
           setIsFlipped(prev => !prev);
           break;
+        // Preset shortcuts (1-4)
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+          if (!(e.target instanceof HTMLInputElement && e.target.type === 'text')) {
+            const slot = parseInt(key) as 1 | 2 | 3 | 4;
+            const side = isFlipped ? 'back' : 'front';
+            if (presets.hasPreset(side, slot)) {
+              e.preventDefault();
+              handleLoadPreset(side, slot);
+            }
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped]);
+  }, [isFlipped, presets, handleLoadPreset]);
 
   // Pre-initialize iOS audio on mount (so it's ready for instant playback)
   useEffect(() => {
@@ -151,6 +238,12 @@ function App() {
       }
     };
   }, []);
+
+  // Reset active preset when switching sides
+  useEffect(() => {
+    setActivePresetFront(null);
+    setActivePresetBack(null);
+  }, [isFlipped]);
 
   useEffect(() => {
     // Audio Logic based on Flip State
@@ -243,18 +336,17 @@ function App() {
         >
           {/* FRONT FACE */}
           <div className="bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 w-full relative flex flex-col backface-hidden">
-            <h1 className="text-3xl font-bold text-center mb-2 bg-linear-to-r from-pink-400 to-purple-400 text-transparent bg-clip-text">
-              BeePink Naural
-            </h1>
-            <p className="text-slate-400 text-center mb-8 text-sm">
-              Binaural Beats & Pink Noise
-            </p>
+            <AppHeader 
+              title="BeePink Naural"
+              subtitle="Binaural Beats & Pink Noise"
+              color="pink"
+            />
 
             <div className="flex justify-center mb-8">
               <PlayButton isPlaying={isPlaying} onClick={togglePlay} />
             </div>
 
-            <div className="space-y-6 flex-1">
+            <div className="space-y-2 flex-1">
               <Slider
                 ref={masterVolRef}
                 label="Master Volume"
@@ -268,9 +360,7 @@ function App() {
                 shortcutChar="v"
               />
 
-              <div className="h-px bg-slate-700 my-4" />
-
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <SectionHeader title="Pink Noise" color="pink" />
                 <Slider
                   ref={noiseVolRef}
@@ -286,7 +376,7 @@ function App() {
                 />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <SectionHeader title="Binaural Beats" color="purple" />
                 
                 <Slider
@@ -302,7 +392,7 @@ function App() {
                   shortcutChar="b"
                 />
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <Slider
                     ref={carrierRef}
                     label="Carrier"
@@ -331,24 +421,33 @@ function App() {
                 <BrainWaveDisplay freq={beatFreq} />
               </div>
 
+              <PresetSection
+                key={`front-${presetVersion}`}
+                side="front"
+                activePreset={activePresetFront}
+                hasPreset={(slot) => presets.hasPreset('front', slot)}
+                onSave={(slot) => handleSavePreset('front', slot)}
+                onLoad={(slot) => handleLoadPreset('front', slot)}
+                onDelete={(slot) => handleDeletePreset('front', slot)}
+              />
+
               <FlipButton onClick={() => setIsFlipped(true)} targetLabel="Naural Pulse" />
             </div>
           </div>
 
           {/* BACK FACE */}
           <div className="backface-hidden absolute top-0 left-0 w-full h-full rotate-y-180 bg-black/40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/10 flex flex-col">
-            <h1 className="text-3xl font-bold text-center mb-2 bg-linear-to-r from-teal-400 to-blue-400 text-transparent bg-clip-text">
-              Naural Pulse
-            </h1>
-            <p className="text-slate-400 text-center mb-8 text-sm">
-              Isochronic Pink Noise Modulation
-            </p>
+            <AppHeader 
+              title="Naural Pulse"
+              subtitle="Isochronic Pink Noise Modulation"
+              color="teal"
+            />
 
             <div className="flex justify-center mb-8">
               <PlayButton isPlaying={isPlaying} onClick={togglePlay} />
             </div>
 
-            <div className="space-y-6 flex-1">
+            <div className="space-y-2 flex-1">
               <Slider
                 label="Master Volume"
                 displayValue={`${Math.round(volume * 100)}%`}
@@ -361,9 +460,7 @@ function App() {
                 shortcutChar="v"
               />
 
-              <div className="h-px bg-slate-700 my-4" />
-
-              <div className="space-y-4">
+              <div className="space-y-2">
                  <SectionHeader title="Entrainment" color="teal" />
                  <Slider
                     ref={neuralFreqRef}
@@ -380,7 +477,7 @@ function App() {
                   <BrainWaveDisplay freq={neuralFreq} />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <SectionHeader title="Modulation" color="blue" />
                 <Slider
                   ref={neuralNoiseVolRef}
@@ -417,6 +514,16 @@ function App() {
                   shortcutChar="s"
                 />
               </div>
+
+              <PresetSection
+                key={`back-${presetVersion}`}
+                side="back"
+                activePreset={activePresetBack}
+                hasPreset={(slot) => presets.hasPreset('back', slot)}
+                onSave={(slot) => handleSavePreset('back', slot)}
+                onLoad={(slot) => handleLoadPreset('back', slot)}
+                onDelete={(slot) => handleDeletePreset('back', slot)}
+              />
 
               <FlipButton onClick={() => setIsFlipped(false)} targetLabel="BeePink Naural" />
             </div>
