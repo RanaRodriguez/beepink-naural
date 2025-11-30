@@ -4,8 +4,7 @@ import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
 import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock, keepIOSAudioAlive } from './audio/unlockIOSAudio';
 import {
   createMediaStreamBridge,
-  playBridge,
-  stopBridge,
+  startBridge,
   destroyBridge,
 } from './audio/mediaStreamBridge';
 import {
@@ -307,10 +306,11 @@ function App() {
       audioContextRef.current.resume(); // Don't await - must stay synchronous for iOS
     }
 
-    // When stopping, also stop the iOS unlock audio and bridge
+    // When stopping, stop the iOS unlock audio (bridge stays playing!)
+    // The MediaStream bridge should NEVER be paused - audio is controlled via gain
     if (isPlaying) {
       stopIOSAudioUnlock();
-      stopBridge();
+      // Note: bridge intentionally NOT stopped - keeps "carrier" playing for lock screen controls
     }
 
     const newPlayingState = !isPlaying;
@@ -328,7 +328,8 @@ function App() {
       });
       setPlaybackState('playing');
       // Start the bridge audio element - this enables lock screen controls
-      playBridge();
+      // startBridge only plays once - subsequent calls are no-ops
+      startBridge();
     } else {
       setPlaybackState('paused');
     }

@@ -1,3 +1,5 @@
+import { setPlaybackState } from './mediaSession';
+
 /**
  * MediaStream Bridge
  *
@@ -8,18 +10,21 @@
  * - Background playback
  * - Media Session API integration
  *
- * The key insight is that iOS/Android only show lock screen controls for
- * HTMLAudioElement playback, not for raw Web Audio API output.
+ * KEY INSIGHT: The HTMLAudioElement must NEVER be paused once started.
+ * iOS Safari requires a user gesture to call play(), but Media Session
+ * handlers are NOT considered user gestures. By keeping the bridge
+ * always "playing", we avoid needing to call play() from lock screen.
+ *
+ * Audio is controlled via Web Audio gain (0 = muted, >0 = audible).
+ * The bridge acts as a "carrier signal" that stays playing.
  *
  * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/createMediaStreamDestination
  */
 
-import { setPlaybackState } from './mediaSession';
-
 interface MediaStreamBridge {
   destination: MediaStreamAudioDestinationNode;
   audioElement: HTMLAudioElement;
-  isPlaying: boolean;
+  isStarted: boolean;  // Has the bridge been started (with user gesture)?
 }
 
 let bridge: MediaStreamBridge | null = null;
@@ -72,7 +77,7 @@ export function createMediaStreamBridge(
     bridge = {
       destination,
       audioElement,
-      isPlaying: false,
+      isStarted: false,
     };
 
     // Set up event listeners to sync Media Session state
@@ -80,15 +85,18 @@ export function createMediaStreamBridge(
       setPlaybackState('playing');
     });
 
+    // IMPORTANT: Bridge should NEVER pause once started.
+    // If pause event fires (e.g., from OS), immediately resume.
+    // Audio muting is controlled via Web Audio gain, not by pausing.
     audioElement.addEventListener('pause', () => {
-      if (bridge?.isPlaying) {
-        // If we're supposed to be playing, try to resume
-        audioElement.play().catch(() => {
-          // If resume fails, update state
+      if (bridge?.isStarted) {
+        // Bridge was started - ALWAYS try to resume
+        // This is the key to making lock screen controls work
+        audioElement.play().catch((error) => {
+          console.warn('Failed to resume bridge after pause event:', error);
+          // Only update state if we truly can't resume
           setPlaybackState('paused');
         });
-      } else {
-        setPlaybackState('paused');
       }
     });
 
@@ -113,51 +121,54 @@ export function getBridgeDestination(): MediaStreamAudioDestinationNode | null {
 
 /**
  * Starts playback of the bridge audio element.
- * Call this when starting audio playback.
+ * IMPORTANT: Call this ONCE on first user interaction.
+ * The bridge stays playing forever - audio is controlled via Web Audio gain.
  */
-export async function playBridge(): Promise<void> {
+export async function startBridge(): Promise<void> {
   if (!bridge) {
     return;
   }
 
-  bridge.isPlaying = true;
+  // Only start once - bridge should never be stopped
+  if (bridge.isStarted) {
+    return;
+  }
+
+  bridge.isStarted = true;
 
   try {
     await bridge.audioElement.play();
+    console.log('MediaStream bridge started - will stay playing');
   } catch (error) {
-    console.warn('Failed to play bridge audio element:', error);
+    console.warn('Failed to start bridge audio element:', error);
+    bridge.isStarted = false;
   }
 }
 
 /**
- * Stops playback of the bridge audio element.
- * Call this when stopping audio playback.
- */
-export function stopBridge(): void {
-  if (!bridge) {
-    return;
-  }
-
-  bridge.isPlaying = false;
-  bridge.audioElement.pause();
-}
-
-/**
- * Handles visibility changes to ensure bridge stays in sync.
+ * Handles visibility changes to ensure bridge stays playing.
+ * The bridge should NEVER be paused - if it is, resume it.
  */
 function handleVisibilityChange(): void {
-  if (!bridge) {
+  if (!bridge || !bridge.isStarted) {
     return;
   }
 
   if (document.visibilityState === 'visible') {
-    // Page is visible again - if we should be playing, ensure audio is playing
-    if (bridge.isPlaying && bridge.audioElement.paused) {
+    // Page is visible again - ensure bridge is still playing
+    if (bridge.audioElement.paused) {
       bridge.audioElement.play().catch((error) => {
         console.warn('Failed to resume bridge on visibility change:', error);
       });
     }
   }
+}
+
+/**
+ * Checks if the bridge has been started.
+ */
+export function isBridgeStarted(): boolean {
+  return bridge?.isStarted ?? false;
 }
 
 /**
