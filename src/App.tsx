@@ -153,6 +153,13 @@ function App() {
     }
   };
 
+  // Handler for flipping that also resets active presets
+  const handleFlip = useCallback((flipTo: boolean) => {
+    setActivePresetFront(null);
+    setActivePresetBack(null);
+    setIsFlipped(flipTo);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement && e.target.type === 'text') {
@@ -203,7 +210,7 @@ function App() {
           break;
         case 'f': // Flip
           e.preventDefault();
-          setIsFlipped(prev => !prev);
+          handleFlip(!isFlipped);
           break;
         // Preset shortcuts (1-4)
         case '1':
@@ -224,7 +231,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlipped, presets, handleLoadPreset]);
+  }, [isFlipped, presets, handleLoadPreset, handleFlip]);
 
   // Pre-initialize iOS audio on mount (so it's ready for instant playback)
   useEffect(() => {
@@ -238,12 +245,6 @@ function App() {
       }
     };
   }, []);
-
-  // Reset active preset when switching sides
-  useEffect(() => {
-    setActivePresetFront(null);
-    setActivePresetBack(null);
-  }, [isFlipped]);
 
   useEffect(() => {
     // Audio Logic based on Flip State
@@ -421,17 +422,20 @@ function App() {
                 <BrainWaveDisplay freq={beatFreq} />
               </div>
 
-              <PresetSection
-                key={`front-${presetVersion}`}
-                side="front"
-                activePreset={activePresetFront}
-                hasPreset={(slot) => presets.hasPreset('front', slot)}
-                onSave={(slot) => handleSavePreset('front', slot)}
-                onLoad={(slot) => handleLoadPreset('front', slot)}
-                onDelete={(slot) => handleDeletePreset('front', slot)}
-              />
+              <div className="space-y-2 pt-4">
+                <SectionHeader title="Presets" color="white" />
+                <PresetSection
+                  key={`front-${presetVersion}`}
+                  side="front"
+                  activePreset={activePresetFront}
+                  hasPreset={(slot) => presets.hasPreset('front', slot)}
+                  onSave={(slot) => handleSavePreset('front', slot)}
+                  onLoad={(slot) => handleLoadPreset('front', slot)}
+                  onDelete={(slot) => handleDeletePreset('front', slot)}
+                />
+              </div>
 
-              <FlipButton onClick={() => setIsFlipped(true)} targetLabel="Naural Pulse" />
+              <FlipButton onClick={() => handleFlip(true)} targetLabel="Naural Pulse" />
             </div>
           </div>
 
@@ -515,17 +519,20 @@ function App() {
                 />
               </div>
 
-              <PresetSection
-                key={`back-${presetVersion}`}
-                side="back"
-                activePreset={activePresetBack}
-                hasPreset={(slot) => presets.hasPreset('back', slot)}
-                onSave={(slot) => handleSavePreset('back', slot)}
-                onLoad={(slot) => handleLoadPreset('back', slot)}
-                onDelete={(slot) => handleDeletePreset('back', slot)}
-              />
+              <div className="space-y-2 pt-4">
+                <SectionHeader title="Presets" color="white" />
+                <PresetSection
+                  key={`back-${presetVersion}`}
+                  side="back"
+                  activePreset={activePresetBack}
+                  hasPreset={(slot) => presets.hasPreset('back', slot)}
+                  onSave={(slot) => handleSavePreset('back', slot)}
+                  onLoad={(slot) => handleLoadPreset('back', slot)}
+                  onDelete={(slot) => handleDeletePreset('back', slot)}
+                />
+              </div>
 
-              <FlipButton onClick={() => setIsFlipped(false)} targetLabel="BeePink Naural" />
+              <FlipButton onClick={() => handleFlip(false)} targetLabel="BeePink Naural" />
             </div>
           </div>
         </motion.div>

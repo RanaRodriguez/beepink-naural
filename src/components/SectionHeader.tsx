@@ -1,6 +1,6 @@
 interface SectionHeaderProps {
   title: string;
-  color: 'pink' | 'purple' | 'teal' | 'blue';
+  color: 'pink' | 'purple' | 'teal' | 'blue' | 'white';
 }
 
 export function SectionHeader({ title, color }: SectionHeaderProps) {
@@ -9,6 +9,7 @@ export function SectionHeader({ title, color }: SectionHeaderProps) {
     purple: 'text-purple-300',
     teal: 'text-teal-300',
     blue: 'text-blue-300',
+    white: 'text-white',
   };
 
   return (

@@ -18,7 +18,7 @@ export function PresetSection({
   onDelete,
 }: PresetSectionProps) {
   return (
-    <div className="pt-4 flex justify-center gap-2 mt-auto">
+    <div className="flex justify-center gap-2 mt-auto">
       {([1, 2, 3, 4] as const).map((slot) => (
         <PresetButton
           key={slot}
