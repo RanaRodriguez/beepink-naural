@@ -118,6 +118,26 @@ export function unlockIOSAudio(): void {
 }
 
 /**
+ * Ensures the silent HTML5 audio element continues playing.
+ * This should be called periodically during playback to maintain
+ * iOS media category and enable background playback.
+ * Works on both iOS and Android.
+ */
+export function keepIOSAudioAlive(): void {
+  if (!silentAudioElement || !isUnlocked) {
+    return;
+  }
+
+  // If audio is paused, resume it
+  // This ensures iOS treats the app as a media app during background playback
+  if (silentAudioElement.paused) {
+    silentAudioElement.play().catch((error) => {
+      console.warn('Failed to keep iOS audio alive:', error);
+    });
+  }
+}
+
+/**
  * Stops and cleans up the silent audio element.
  * Call this when audio playback is stopped to be a good citizen.
  */
@@ -125,6 +145,7 @@ export function stopIOSAudioUnlock(): void {
   if (silentAudioElement) {
     silentAudioElement.pause();
     silentAudioElement.currentTime = 0;
+    isUnlocked = false;
   }
 }
 

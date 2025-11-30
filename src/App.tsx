@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PinkNoiseGenerator } from './audio/PinkNoiseGenerator';
 import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
-import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock } from './audio/unlockIOSAudio';
+import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock, keepIOSAudioAlive } from './audio/unlockIOSAudio';
 import {
   setMediaMetadata,
   setupMediaSessionActions,
   setPlaybackState,
   clearMediaSession,
 } from './audio/mediaSession';
-import { requestWakeLock, releaseWakeLock, reacquireWakeLockIfNeeded } from './audio/wakeLock';
 import { Slider } from './components/Slider';
 import { SectionHeader } from './components/SectionHeader';
 import { PlayButton } from './components/PlayButton';
@@ -368,33 +367,59 @@ function App() {
       });
     }
 
+    // Polling fallback: check state periodically (some browsers don't fire events reliably)
+    const pollInterval = setInterval(() => {
+      if (ctx.state === 'suspended' && isPlaying) {
+        ctx.resume().catch((error) => {
+          console.warn('Failed to resume AudioContext (polling):', error);
+        });
+      }
+    }, 1000); // Check every second
+
     return () => {
       ctx.removeEventListener('statechange', handleStateChange);
+      clearInterval(pollInterval);
     };
   }, [isPlaying]);
 
-  // Manage Wake Lock based on playback state
+  // Keep HTML5 audio element alive during playback for background audio support
+  // This ensures iOS/Android treat the app as a media app
   useEffect(() => {
-    if (isPlaying) {
-      // Request wake lock when playback starts
-      requestWakeLock();
-    } else {
-      // Release wake lock when playback stops
-      releaseWakeLock();
-    }
+    if (!isPlaying) return;
+
+    // Keep audio alive immediately
+    keepIOSAudioAlive();
+
+    // Keep audio alive periodically (every 5 seconds)
+    // This ensures continuous background playback on iOS and Android
+    const keepAliveInterval = setInterval(() => {
+      keepIOSAudioAlive();
+    }, 5000);
 
     return () => {
-      // Cleanup: release wake lock on unmount
-      releaseWakeLock();
+      clearInterval(keepAliveInterval);
     };
   }, [isPlaying]);
 
-  // Handle visibility changes to reacquire wake lock if needed
+  // Handle visibility changes to resume AudioContext if needed
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
-        // Try to reacquire wake lock when app becomes visible again
-        await reacquireWakeLockIfNeeded();
+      if (!audioContextRef.current || !isPlaying) return;
+
+      const ctx = audioContextRef.current;
+
+      // When app becomes visible again, check and resume AudioContext if suspended
+      if (document.visibilityState === 'visible' && ctx.state === 'suspended') {
+        try {
+          await ctx.resume();
+        } catch (error) {
+          console.warn('Failed to resume AudioContext on visibility change:', error);
+        }
+      }
+
+      // Also keep HTML5 audio alive on visibility changes
+      if (isPlaying) {
+        keepIOSAudioAlive();
       }
     };
 
@@ -656,7 +681,7 @@ function App() {
       
       <div className="mt-8 text-xs text-slate-600 max-w-md text-center">
         <p>Use stereo headphones for the binaural/spatial effect.</p>
-        <p className="mt-2">Made by <a href="https://sueden.social/@Rana" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400 underline underline-offset-2">Rana</a></p>
+        <p className="mt-2">Made by <a href="https://sueden.social/@Rana" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400 underline underline-offset-2">Rana 💓</a></p>
       </div>
     </div>
   );
