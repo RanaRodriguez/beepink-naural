@@ -3,6 +3,12 @@ import { PinkNoiseGenerator } from './audio/PinkNoiseGenerator';
 import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
 import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock, keepIOSAudioAlive } from './audio/unlockIOSAudio';
 import {
+  createMediaStreamBridge,
+  playBridge,
+  stopBridge,
+  destroyBridge,
+} from './audio/mediaStreamBridge';
+import {
   setMediaMetadata,
   setupMediaSessionActions,
   setPlaybackState,
@@ -273,8 +279,17 @@ function App() {
       const noiseGen = new PinkNoiseGenerator(ctx);
       const beatGen = new BinauralBeatGenerator(ctx);
 
+      // Connect to regular audio output
       noiseGen.connect(ctx.destination);
       beatGen.connect(ctx.destination);
+
+      // Create MediaStream bridge for lock screen controls
+      // This routes audio through an HTMLAudioElement so iOS/Android recognize it as media
+      const bridgeDestination = createMediaStreamBridge(ctx);
+      if (bridgeDestination) {
+        noiseGen.connect(bridgeDestination);
+        beatGen.connect(bridgeDestination);
+      }
 
       noiseGenRef.current = noiseGen;
       beatGenRef.current = beatGen;
@@ -292,15 +307,16 @@ function App() {
       audioContextRef.current.resume(); // Don't await - must stay synchronous for iOS
     }
 
-    // When stopping, also stop the iOS unlock audio
+    // When stopping, also stop the iOS unlock audio and bridge
     if (isPlaying) {
       stopIOSAudioUnlock();
+      stopBridge();
     }
 
     const newPlayingState = !isPlaying;
     setIsPlaying(newPlayingState);
 
-    // Update Media Session
+    // Update Media Session and bridge
     if (newPlayingState) {
       const title = isFlipped ? 'Naural Pulse' : 'BeePink Naural';
       const subtitle = isFlipped
@@ -311,6 +327,8 @@ function App() {
         artist: subtitle,
       });
       setPlaybackState('playing');
+      // Start the bridge audio element - this enables lock screen controls
+      playBridge();
     } else {
       setPlaybackState('paused');
     }
@@ -355,6 +373,8 @@ function App() {
 
   useEffect(() => {
     return () => {
+      // Cleanup bridge and audio context on unmount
+      destroyBridge();
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
