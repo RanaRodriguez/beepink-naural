@@ -9,7 +9,6 @@ import { BrainWaveDisplay } from './components/BrainWaveDisplay';
 import { BackgroundBlob } from './components/BackgroundBlob';
 import { Switch } from './components/Switch';
 import { AnimatePresence, useMotionValue, motion } from 'motion/react';
-import { useIsMobile } from './hooks/useIsMobile';
 import { useIsMozilla } from './hooks/useIsMozilla';
 
 interface FlipButtonProps {
@@ -31,12 +30,11 @@ const FlipButton = ({ onClick, targetLabel }: FlipButtonProps) => (
 );
 
 function App() {
-  const isMobile = useIsMobile();
   const isMozilla = useIsMozilla();
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.3);
   // Disable blob on Mozilla browsers due to rendering issues
-  const [showBlob, setShowBlob] = useState(!isMobile && !isMozilla);
+  const [showBlob, setShowBlob] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
 
   // Front Face State (Classic)

@@ -33,7 +33,7 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(({
   useEffect(() => {
     setInputValue(value.toString());
   }, [value]);
-  
+
   const accentColors = {
     pink: 'text-pink-500',
     purple: 'text-purple-500',
@@ -44,7 +44,7 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(({
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
-    
+
     // Validate: allow only numbers and one decimal point
     if (!/^\d*\.?\d*$/.test(rawValue)) {
       return;
@@ -82,15 +82,15 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(({
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
       const currentVal = parseFloat(inputValue) || min;
-      
+
       const isUpOrRight = e.key === 'ArrowUp' || e.key === 'ArrowRight';
       const direction = isUpOrRight ? 1 : -1;
-      
+
       const multiplier = e.shiftKey ? 10 : 1;
       const changeAmount = step * multiplier;
 
       const newValue = Math.min(Math.max(currentVal + direction * changeAmount, min), max);
-      
+
       // Fix floating point precision issues (e.g. 0.1 + 0.2)
       // If step is integer (e.g. 1), precision is 0. If 0.1, it's 1.
       // But if we multiply by 10, we might change precision needs.
@@ -105,7 +105,7 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(({
 
   const renderLabel = () => {
     if (!label) return null;
-    
+
     if (!shortcutChar) return <span>{label}</span>;
 
     const index = label.toLowerCase().indexOf(shortcutChar.toLowerCase());
