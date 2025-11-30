@@ -7,10 +7,15 @@
  * By playing a silent HTML5 audio element alongside Web Audio, we force iOS
  * to use the media category for all audio, bypassing the mute switch.
  *
+ * Additionally, we use the Audio Session API (iOS 17+) to explicitly set
+ * the audio session type to "playback", which enables background audio
+ * when the screen is locked or the app is backgrounded.
+ *
  * This technique is used by YouTube, Bandcamp, and other media sites.
  *
  * @see https://github.com/feross/unmute-ios-audio
  * @see https://www.audjust.com/blog/unmute-web-audio-on-ios
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioSession
  */
 
 // Base64-encoded silent WAV file (44 bytes, minimal valid WAV)
@@ -21,6 +26,21 @@ const SILENT_WAV_BASE64 =
 let silentAudioElement: HTMLAudioElement | null = null;
 let isUnlocked = false;
 let visibilityHandlerAttached = false;
+let audioSessionConfigured = false;
+
+/**
+ * TypeScript declaration for the Audio Session API (iOS 17+)
+ * This API is still experimental and not in standard TypeScript definitions
+ */
+interface AudioSession {
+  type: 'auto' | 'playback' | 'transient' | 'transient-solo' | 'ambient' | 'play-and-record';
+}
+
+declare global {
+  interface Navigator {
+    audioSession?: AudioSession;
+  }
+}
 
 /**
  * Detects if the current device is iOS (iPhone, iPad, iPod)
@@ -30,6 +50,31 @@ function isIOS(): boolean {
 
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPad with iOS 13+
+}
+
+/**
+ * Configures the Audio Session API (iOS 17+) for background playback.
+ * This tells Safari to treat our audio as "media" (like music) rather than
+ * "ambient" (like game sound effects), enabling background playback when
+ * the screen is locked.
+ *
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/AudioSession
+ */
+function configureAudioSession(): void {
+  if (audioSessionConfigured) {
+    return;
+  }
+
+  // Audio Session API is available in iOS 17+ Safari
+  if ('audioSession' in navigator && navigator.audioSession) {
+    try {
+      navigator.audioSession.type = 'playback';
+      audioSessionConfigured = true;
+      console.log('Audio Session API: configured for playback mode');
+    } catch (error) {
+      console.warn('Failed to configure Audio Session API:', error);
+    }
+  }
 }
 
 /**
@@ -93,6 +138,10 @@ export function initIOSAudio(): void {
  * Any async operation breaks the "trust chain" and iOS will block the audio.
  */
 export function unlockIOSAudio(): void {
+  // Configure Audio Session API for background playback (iOS 17+)
+  // This must be called before starting audio playback
+  configureAudioSession();
+
   // Skip if not iOS or already unlocked
   if (!isIOS() || isUnlocked) {
     return;
@@ -156,6 +205,7 @@ export function resetIOSAudioUnlock(): void {
   stopIOSAudioUnlock();
   silentAudioElement = null;
   isUnlocked = false;
+  audioSessionConfigured = false;
 
   // Remove visibility change handler
   if (visibilityHandlerAttached) {
