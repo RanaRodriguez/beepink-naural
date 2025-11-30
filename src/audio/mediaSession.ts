@@ -123,3 +123,44 @@ export function clearMediaSession(): void {
   }
 }
 
+/**
+ * Refresh the media session state.
+ * Call this when the page becomes visible again to ensure lock screen controls
+ * are properly synced. iOS Safari can lose track of the media session state
+ * when the page is backgrounded.
+ */
+export function refreshMediaSession(
+  metadata: MediaSessionMetadata,
+  isPlaying: boolean
+): void {
+  if (!isMediaSessionSupported()) {
+    return;
+  }
+
+  try {
+    // Re-set metadata to ensure it's current
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album || 'BeePink Naural',
+      artwork: metadata.artwork || [
+        {
+          src: '/favicon-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+        },
+        {
+          src: '/favicon-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+        },
+      ],
+    });
+
+    // Re-set playback state
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  } catch (error) {
+    console.warn('Failed to refresh media session:', error);
+  }
+}
+

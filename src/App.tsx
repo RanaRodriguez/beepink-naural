@@ -7,6 +7,7 @@ import {
   setupMediaSessionActions,
   setPlaybackState,
   clearMediaSession,
+  refreshMediaSession,
 } from './audio/mediaSession';
 import { Slider } from './components/Slider';
 import { SectionHeader } from './components/SectionHeader';
@@ -315,25 +316,42 @@ function App() {
     }
   }, [isPlaying, isFlipped, neuralFreq, neuralPulseDepth, neuralPanDepth, baseFreq, beatFreq]);
 
-  // Setup Media Session API actions
+  // Ref to track current playing state for media session callbacks
+  // This allows callbacks to access current state without re-registering handlers
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  // Ref for togglePlay to avoid re-registering handlers
+  const togglePlayRef = useRef(togglePlay);
+  useEffect(() => {
+    togglePlayRef.current = togglePlay;
+  }, [togglePlay]);
+
+  // Setup Media Session API actions - ONLY ONCE on mount
+  // Using refs to access current state avoids re-registration on every state change
   useEffect(() => {
     setupMediaSessionActions(
       () => {
-        if (!isPlaying) {
-          togglePlay();
+        // Play action: only toggle if not already playing
+        if (!isPlayingRef.current) {
+          togglePlayRef.current();
         }
       },
       () => {
-        if (isPlaying) {
-          togglePlay();
+        // Pause action: only toggle if currently playing
+        if (isPlayingRef.current) {
+          togglePlayRef.current();
         }
       }
     );
 
+    // Only clear media session on unmount, not on every re-render
     return () => {
       clearMediaSession();
     };
-  }, [isPlaying, togglePlay]);
+  }, []); // Empty deps - register handlers only once
 
   useEffect(() => {
     return () => {
@@ -401,25 +419,44 @@ function App() {
     };
   }, [isPlaying]);
 
-  // Handle visibility changes to resume AudioContext if needed
+  // Handle visibility changes to resume AudioContext and refresh Media Session
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (!audioContextRef.current || !isPlaying) return;
-
-      const ctx = audioContextRef.current;
-
-      // When app becomes visible again, check and resume AudioContext if suspended
-      if (document.visibilityState === 'visible' && ctx.state === 'suspended') {
-        try {
-          await ctx.resume();
-        } catch (error) {
-          console.warn('Failed to resume AudioContext on visibility change:', error);
+      // When page becomes visible again (screen unlocked, app foregrounded)
+      if (document.visibilityState === 'visible') {
+        // Resume AudioContext if suspended
+        if (audioContextRef.current && isPlaying) {
+          const ctx = audioContextRef.current;
+          if (ctx.state === 'suspended') {
+            try {
+              await ctx.resume();
+            } catch (error) {
+              console.warn('Failed to resume AudioContext on visibility change:', error);
+            }
+          }
         }
-      }
 
-      // Also keep HTML5 audio alive on visibility changes
-      if (isPlaying) {
-        keepIOSAudioAlive();
+        // Refresh Media Session to ensure lock screen controls work
+        // iOS Safari can lose track of media session state when backgrounded
+        if (isPlaying) {
+          const title = isFlipped ? 'Naural Pulse' : 'BeePink Naural';
+          const subtitle = isFlipped
+            ? 'Isochronic Pink Noise Modulation'
+            : 'Binaural Beats & Pink Noise';
+          refreshMediaSession({ title, artist: subtitle }, true);
+        }
+
+        // Keep HTML5 audio alive
+        if (isPlaying) {
+          keepIOSAudioAlive();
+        }
+      } else {
+        // Page is hidden (screen locked, app backgrounded)
+        // Ensure playback state is correctly set so lock screen shows controls
+        if (isPlaying) {
+          setPlaybackState('playing');
+          keepIOSAudioAlive();
+        }
       }
     };
 
@@ -427,7 +464,7 @@ function App() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isPlaying]);
+  }, [isPlaying, isFlipped]);
 
   useEffect(() => {
     // Audio Logic based on Flip State
