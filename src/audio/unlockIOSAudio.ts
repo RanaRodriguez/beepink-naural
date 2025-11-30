@@ -20,6 +20,7 @@ const SILENT_WAV_BASE64 =
 
 let silentAudioElement: HTMLAudioElement | null = null;
 let isUnlocked = false;
+let visibilityHandlerAttached = false;
 
 /**
  * Detects if the current device is iOS (iPhone, iPad, iPod)
@@ -29,6 +30,25 @@ function isIOS(): boolean {
 
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPad with iOS 13+
+}
+
+/**
+ * Handle visibility changes to ensure audio continues in background
+ */
+function handleVisibilityChange(): void {
+  if (!isIOS() || !silentAudioElement || !isUnlocked) {
+    return;
+  }
+
+  // When app goes to background, ensure audio element is still playing
+  if (document.visibilityState === 'hidden') {
+    // Check if audio is paused and resume if needed
+    if (silentAudioElement.paused) {
+      silentAudioElement.play().catch((error) => {
+        console.warn('Failed to resume iOS audio on visibility change:', error);
+      });
+    }
+  }
 }
 
 /**
@@ -56,6 +76,12 @@ export function initIOSAudio(): void {
 
   // Force load the audio data
   silentAudioElement.load();
+
+  // Attach visibility change handler for background playback
+  if (!visibilityHandlerAttached) {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    visibilityHandlerAttached = true;
+  }
 }
 
 /**
@@ -109,4 +135,10 @@ export function resetIOSAudioUnlock(): void {
   stopIOSAudioUnlock();
   silentAudioElement = null;
   isUnlocked = false;
+
+  // Remove visibility change handler
+  if (visibilityHandlerAttached) {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    visibilityHandlerAttached = false;
+  }
 }

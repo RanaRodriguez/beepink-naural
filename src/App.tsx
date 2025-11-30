@@ -2,6 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { PinkNoiseGenerator } from './audio/PinkNoiseGenerator';
 import { BinauralBeatGenerator } from './audio/BinauralBeatGenerator';
 import { initIOSAudio, unlockIOSAudio, stopIOSAudioUnlock } from './audio/unlockIOSAudio';
+import {
+  setMediaMetadata,
+  setupMediaSessionActions,
+  setPlaybackState,
+  clearMediaSession,
+} from './audio/mediaSession';
+import { requestWakeLock, releaseWakeLock, reacquireWakeLockIfNeeded } from './audio/wakeLock';
 import { Slider } from './components/Slider';
 import { SectionHeader } from './components/SectionHeader';
 import { PlayButton } from './components/PlayButton';
@@ -158,7 +165,19 @@ function App() {
     setActivePresetFront(null);
     setActivePresetBack(null);
     setIsFlipped(flipTo);
-  }, []);
+
+    // Update Media Session metadata when mode changes
+    if (isPlaying) {
+      const title = flipTo ? 'Naural Pulse' : 'BeePink Naural';
+      const subtitle = flipTo
+        ? 'Isochronic Pink Noise Modulation'
+        : 'Binaural Beats & Pink Noise';
+      setMediaMetadata({
+        title,
+        artist: subtitle,
+      });
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -238,39 +257,8 @@ function App() {
     initIOSAudio();
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    // Audio Logic based on Flip State
-    if (!isFlipped) {
-       // Front Logic
-       if (noiseGenRef.current) {
-          noiseGenRef.current.setVolume(isPlaying ? noiseVolume * volume : 0);
-          noiseGenRef.current.setModulation(0, 0, 0); // Disable modulation
-       }
-       if (beatGenRef.current) {
-          beatGenRef.current.setVolume(isPlaying ? beatVolume * volume : 0);
-          beatGenRef.current.setFrequencies(baseFreq, beatFreq);
-       }
-    } else {
-       // Back Logic
-       if (noiseGenRef.current) {
-          noiseGenRef.current.setVolume(isPlaying ? neuralNoiseVolume * volume : 0);
-          noiseGenRef.current.setModulation(neuralFreq, neuralPulseDepth, neuralPanDepth);
-       }
-       if (beatGenRef.current) {
-          beatGenRef.current.setVolume(0); // Mute binaural beats
-       }
-    }
-  }, [isPlaying, volume, noiseVolume, beatVolume, baseFreq, beatFreq, isFlipped, neuralFreq, neuralPulseDepth, neuralPanDepth, neuralNoiseVolume]);
-
-  const togglePlay = () => {
+  // Define togglePlay with useCallback so it can be used in useEffect
+  const togglePlay = useCallback(() => {
     // When starting playback, unlock iOS audio first (bypasses mute switch)
     // IMPORTANT: Must be synchronous - no await before play() calls on iOS Safari
     if (!isPlaying) {
@@ -309,8 +297,136 @@ function App() {
       stopIOSAudioUnlock();
     }
 
-    setIsPlaying(!isPlaying);
-  };
+    const newPlayingState = !isPlaying;
+    setIsPlaying(newPlayingState);
+
+    // Update Media Session
+    if (newPlayingState) {
+      const title = isFlipped ? 'Naural Pulse' : 'BeePink Naural';
+      const subtitle = isFlipped
+        ? 'Isochronic Pink Noise Modulation'
+        : 'Binaural Beats & Pink Noise';
+      setMediaMetadata({
+        title,
+        artist: subtitle,
+      });
+      setPlaybackState('playing');
+    } else {
+      setPlaybackState('paused');
+    }
+  }, [isPlaying, isFlipped, neuralFreq, neuralPulseDepth, neuralPanDepth, baseFreq, beatFreq]);
+
+  // Setup Media Session API actions
+  useEffect(() => {
+    setupMediaSessionActions(
+      () => {
+        if (!isPlaying) {
+          togglePlay();
+        }
+      },
+      () => {
+        if (isPlaying) {
+          togglePlay();
+        }
+      }
+    );
+
+    return () => {
+      clearMediaSession();
+    };
+  }, [isPlaying, togglePlay]);
+
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Monitor AudioContext state and auto-resume when suspended during playback
+  useEffect(() => {
+    if (!audioContextRef.current || !isPlaying) return;
+
+    const ctx = audioContextRef.current;
+
+    const handleStateChange = () => {
+      // Auto-resume if context gets suspended while we're playing
+      if (ctx.state === 'suspended' && isPlaying) {
+        ctx.resume().catch((error) => {
+          console.warn('Failed to resume AudioContext:', error);
+        });
+      }
+    };
+
+    ctx.addEventListener('statechange', handleStateChange);
+
+    // Also check initial state
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch((error) => {
+        console.warn('Failed to resume AudioContext on mount:', error);
+      });
+    }
+
+    return () => {
+      ctx.removeEventListener('statechange', handleStateChange);
+    };
+  }, [isPlaying]);
+
+  // Manage Wake Lock based on playback state
+  useEffect(() => {
+    if (isPlaying) {
+      // Request wake lock when playback starts
+      requestWakeLock();
+    } else {
+      // Release wake lock when playback stops
+      releaseWakeLock();
+    }
+
+    return () => {
+      // Cleanup: release wake lock on unmount
+      releaseWakeLock();
+    };
+  }, [isPlaying]);
+
+  // Handle visibility changes to reacquire wake lock if needed
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        // Try to reacquire wake lock when app becomes visible again
+        await reacquireWakeLockIfNeeded();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPlaying]);
+
+  useEffect(() => {
+    // Audio Logic based on Flip State
+    if (!isFlipped) {
+       // Front Logic
+       if (noiseGenRef.current) {
+          noiseGenRef.current.setVolume(isPlaying ? noiseVolume * volume : 0);
+          noiseGenRef.current.setModulation(0, 0, 0); // Disable modulation
+       }
+       if (beatGenRef.current) {
+          beatGenRef.current.setVolume(isPlaying ? beatVolume * volume : 0);
+          beatGenRef.current.setFrequencies(baseFreq, beatFreq);
+       }
+    } else {
+       // Back Logic
+       if (noiseGenRef.current) {
+          noiseGenRef.current.setVolume(isPlaying ? neuralNoiseVolume * volume : 0);
+          noiseGenRef.current.setModulation(neuralFreq, neuralPulseDepth, neuralPanDepth);
+       }
+       if (beatGenRef.current) {
+          beatGenRef.current.setVolume(0); // Mute binaural beats
+       }
+    }
+  }, [isPlaying, volume, noiseVolume, beatVolume, baseFreq, beatFreq, isFlipped, neuralFreq, neuralPulseDepth, neuralPanDepth, neuralNoiseVolume]);
 
   return (
     <div className="min-h-screen bg-black text-slate-100 flex flex-col items-center justify-center px-8 py-14 font-sans relative z-0 overflow-hidden">
