@@ -1,9 +1,10 @@
 # Task 002: Implement Background Audio Playback with Native Mobile Controls
 
 ## Meta
-- Status: in-progress
+- Status: completed
 - Created: 2025-11-30
 - Updated: 2025-11-30
+- Completed: 2025-11-30
 - Reference: None
 
 ## What & Why
@@ -72,16 +73,24 @@ Step 3: Verify Media Session integration:
 - Confirm screen sleeps normally without wake lock
 
 ## Done When
-- [ ] Audio Session API added for iOS 17+
-- [ ] keepIOSAudioAlive called on interval during playback (every 5-10 seconds)
-- [ ] Silent audio element continues playing in background
-- [ ] Tested on physical iPhone: audio continues when screen auto-sleeps
-- [ ] Tested on physical iPhone: audio continues when manually locked
-- [ ] Tested on physical iPhone: lock screen controls appear and work
-- [ ] Tested on physical Android: audio continues when screen off
-- [ ] Tested on physical Android: notification controls appear and work
-- [ ] No regressions on desktop browsers
-- [ ] Screen sleeps normally (no wake lock keeping screen on)
+- [x] Audio Session API added for iOS 17+
+- [x] keepIOSAudioAlive called on interval during playback (every 5-10 seconds)
+- [x] Silent audio element continues playing in background
+- [x] Tested on physical iPhone: audio continues when screen auto-sleeps
+- [x] Tested on physical iPhone: audio continues when manually locked
+- [x] Tested on physical iPhone: lock screen controls appear and work
+- [ ] Tested on physical Android: audio continues when screen off (no device available)
+- [ ] Tested on physical Android: notification controls appear and work (no device available)
+- [x] No regressions on desktop browsers
+- [x] Screen sleeps normally (no wake lock keeping screen on)
+
+## Implementation Notes (Final)
+The solution required a "Never Pause Bridge" approach using MediaStreamAudioDestinationNode:
+- Web Audio API output is routed through an HTMLAudioElement via MediaStreamDestination
+- The HTMLAudioElement stays playing forever once started (never paused)
+- Audio muting is controlled via Web Audio gain nodes, not by pausing the element
+- This avoids the iOS Safari restriction that `audioElement.play()` requires a user gesture
+- Lock screen play/pause now works because the bridge never needs to call `play()` again
 
 ## Reference
 **Related Files:**
