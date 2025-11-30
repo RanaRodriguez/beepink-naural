@@ -718,7 +718,7 @@ function App() {
       
       <div className="mt-8 text-xs text-slate-600 max-w-md text-center">
         <p>Use stereo headphones for the binaural/spatial effect.</p>
-        <p className="mt-2">Made by <a href="https://sueden.social/@Rana" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400 underline underline-offset-2">Rana 💓</a></p>
+        <p className="mt-2">Made by <a href="https://sueden.social/@Rana" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-400 underline underline-offset-2">Rana</a></p>
       </div>
     </div>
   );
